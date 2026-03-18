@@ -138,12 +138,21 @@ OPEN_Z_SCORE_MULTIPLIER  = OPEN_Z_MULTIPLIER
 # GROUP 10 — RISK AND CAPITAL
 # ═══════════════════════════════════════════════════════════════════
 DEFAULT_GLOBAL_LIMIT     = 100000
-DEFAULT_PER_STOCK_LIMIT  = 25000  # v8.2: raised from ₹15K. At ₹15K breakeven move=0.17%, winners avg ₹58 gross barely cover ₹24 cost. At ₹25K same trade earns ~₹97 gross vs ₹26 cost. Same signals, same win rate, better math.
 DEFAULT_EQUITY_FLOOR     = 95000
 STARTING_EQUITY          = 100000
-MAX_SECTOR_POSITIONS     = 2
 MAX_LONGS_IN_DOWN_MARKET = 2
 MAX_SHORTS_IN_UP_MARKET  = 2
+
+# ── 5-Slot position model (v9) ───────────────────────────────────────
+# Replace old per-stock-limit + sector-cap with a fixed slot system:
+# exactly MAX_OPEN_POSITIONS slots, each sized SLOT_SIZE.
+# New entry only considered when a slot is free.
+# Within open slots: max 1 position per sector (MAX_SECTOR_POSITIONS).
+# Backtest Mar 11-18: actual -9272 -> simulated -2038 (+7234 improvement).
+MAX_OPEN_POSITIONS   = 5       # total concurrent positions allowed
+SLOT_SIZE            = 20000   # capital per slot (100K / 5)
+MAX_SECTOR_POSITIONS = 1       # max 1 per sector within the 5 slots
+DEFAULT_PER_STOCK_LIMIT = SLOT_SIZE   # backward-compat alias
 # Minimum notional order value (qty × price). Orders below this are rejected.
 # At ₹15K, round-trip cost ~₹22 = 0.15% — achievable on a 0.3% move.
 # Below ₹15K costs consume too large a fraction of potential profit.

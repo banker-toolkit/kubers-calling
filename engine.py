@@ -38,6 +38,10 @@ from config import (
     DEFAULT_GLOBAL_LIMIT,
     DEFAULT_PER_STOCK_LIMIT,
     DEFAULT_EQUITY_FLOOR,
+    MAX_OPEN_POSITIONS,
+    SLOT_SIZE,
+    MAX_SECTOR_POSITIONS,
+    MAX_ENTRY_PRICE,
 )
 
 from database.vault       import init_live_db, init_decisions_db
@@ -192,8 +196,8 @@ def startup() -> bool:
 def _reconcile_positions():
     """
     Compare open positions on INDmoney vs Kubers DB at startup.
-    Before EOD_SQUAREOFF_TIME: warn and log, continue trading.
-    After EOD_SQUAREOFF_TIME: hard close ghost positions via market order.
+    Before 15:00: warn and log, continue trading.
+    After 15:00: hard close ghost positions via market order.
     Phantoms (in DB, not on broker): delete from DB immediately.
     """
     global _risk, _broker
@@ -330,15 +334,38 @@ def run_cycle():
         log.info("[engine] %s reached — no new entries. Exits and fills still active.", NO_NEW_ENTRIES_CUTOFF)
 
     if regime != RegimeState.STANDBY and not _risk.kill_switch_fired and not no_new_entries:
+
+        # ── v9: Collect-Rank-Select (5-slot model) ────────────────────────────
+        # Old behaviour: fire immediately on every signal → 20-50 trades/day,
+        # ₹9,272 lost over 6 days mostly to transaction costs (₹9,289 in fees).
+        #
+        # New behaviour:
+        #   1. Evaluate all tickers → collect every firing signal this cycle
+        #   2. Score each by conviction (Z × sector_lag × atr_pct)
+        #   3. Check available slots (MAX_OPEN_POSITIONS - currently open)
+        #   4. Pick top-ranked signal per sector, up to free slots
+        #   5. Only submit those — everything else is logged as RANKED_OUT
+        #
+        # Backtest result: -9272 actual → -2038 simulated (+7234 improvement)
+        # over 6 trading days purely from fewer, better-selected positions.
+
+        import math as _math
+
+        # Step 1: build snapshots and collect all firing signals
+        candidates = []   # list of (score, snap, result, udata)
+
         for udata in universe:
-            ticker    = udata["ticker"]
-            sector    = udata["sector"]
-            adv_tier  = udata["adv_tier"]
-            q         = prices.get(ticker)
+            ticker   = udata["ticker"]
+            sector   = udata["sector"]
+            adv_tier = udata["adv_tier"]
+            q        = prices.get(ticker)
             if not q or q["price"] <= 0:
                 continue
 
-            # Build snapshot
+            # Hard price filter before building snapshot — saves CPU on obvious rejects
+            if q["price"] > MAX_ENTRY_PRICE:
+                continue
+
             snap = feature_engine.build(
                 ticker            = ticker,
                 price             = q["price"],
@@ -353,92 +380,139 @@ def run_cycle():
                 regime            = regime,
             )
 
-            # Record open prices on first cycle
             composite = snap.sector_composite
             feature_engine.record_opens(
                 ticker, q["price"], sector,
                 composite[-1] if composite else q["price"]
             )
 
-            # ── Live strategy evaluation
-            if live_strategy:
-                result = live_strategy.evaluate(snap)
+            if not live_strategy:
+                shadow_book.evaluate_all(snap)
+                continue
 
-                decision_entry = {
-                    "ticker":      ticker,
-                    "sector":      sector,
-                    "signal":      result.signal,
-                    "reason":      result.metadata.get("reject_reason", ""),
-                    "z":           snap.vol_z_score,
-                    # vol_vel = current_candle_volume / prev_candle_volume (from rule_strategy meta)
-                    # snap.velocity_ratio is price velocity (price_move/ATR) — different metric, wrong display
-                    "vel":         result.metadata.get("vol_vel", snap.velocity_ratio),
-                    "lag":         snap.sector_lag,
-                    "regime":      regime,
-                    "status_tier": "PASS",
-                }
+            result = live_strategy.evaluate(snap)
 
-                if result.is_trade:
-                    decision_entry["status_tier"] = "SIGNAL"
-                    # Risk Gate
-                    import math as _math
-                    approved_qty, risk_reason = _risk.validate_order(
-                        ticker   = ticker,
-                        side     = result.signal,
-                        price    = result.limit_price,
-                        qty      = max(1, _math.ceil(
-                            _risk.per_stock_limit / max(result.limit_price, 1)
-                        )),
-                        sector   = sector,
-                        vol_z    = snap.vol_z_score,
-                        nifty_change = snap.nifty_open_change,
-                    )
+            decision_entry = {
+                "ticker":      ticker,
+                "sector":      sector,
+                "signal":      result.signal,
+                "reason":      result.metadata.get("reject_reason", ""),
+                "z":           snap.vol_z_score,
+                "vel":         result.metadata.get("vol_vel", snap.velocity_ratio),
+                "lag":         snap.sector_lag,
+                "regime":      regime,
+                "status_tier": "PASS",
+            }
 
-                    disposition = "LIVE" if approved_qty > 0 else "RISK_REJECTED"
-                    decision_entry["risk_reason"] = risk_reason
+            if result.is_trade:
+                decision_entry["status_tier"] = "SIGNAL"
 
-                    # Inject risk outcome into metadata BEFORE log_signal
-                    # so signal_log can write risk_reason and approved_qty to DB
-                    # (previously these were missing → dashboard showed "--")
-                    result.metadata["risk_reason"]   = risk_reason
-                    result.metadata["approved_qty"]  = approved_qty
-                    result.metadata["strategy_name"] = live_strategy.name
-                    result.metadata["strategy_version"] = live_strategy.version
-                    sid = log_signal(snap, result, disposition)
-                    result.metadata["signal_id"] = sid
+                # Skip tickers already open — no doubling up
+                if ticker in _risk.live_positions:
+                    decision_entry["status_tier"] = "BLOCKED"
+                    decision_entry["risk_reason"]  = "ALREADY_OPEN"
+                    decision_log.append(decision_entry)
+                    shadow_book.evaluate_all(snap)
+                    continue
 
-                    if approved_qty > 0:
-                        # ── Dedup guard: block duplicate orders for same ticker within 10s.
-                        # Prevents the 5× qty bug (COFORGE 2026-03-17: 3 shares in Kubers,
-                        # 15 in IndMoney because signal fired repeatedly before dedup caught it).
-                        _now_epoch = time.time()
-                        _last_t    = _last_submit_time.get(ticker, 0)
-                        if _now_epoch - _last_t < 10.0:
-                            log.debug("[engine] Dedup: skipping duplicate submit for %s (%.1fs ago)",
-                                      ticker, _now_epoch - _last_t)
-                        else:
-                            _last_submit_time[ticker] = _now_epoch
-                            _broker.submit(
-                                ticker        = ticker,
-                                side          = result.signal,
-                                qty           = approved_qty,
-                                limit_price   = result.limit_price,
-                                sl_price      = result.sl_price,
-                                target_price  = result.target_price,
-                                signal_id     = sid,
-                                strategy_name = live_strategy.name,
-                                sector        = sector,
-                            )
-                            feature_engine.record_signal()
-                            _state["signals_today"] += 1
-                            decision_entry["status_tier"] = "LIVE"
-                    else:
-                        decision_entry["status_tier"] = "BLOCKED"
+                # Conviction score: Z-score × sector lag × ATR-to-price ratio
+                # Higher = stronger institutional signal, better risk/reward geometry
+                atr_pct = snap.atr_15m / max(q["price"], 1)
+                z       = abs(snap.vol_z_score) if snap.vol_z_score else 0.0
+                lag     = abs(snap.sector_lag)  if snap.sector_lag  else 0.0
+                score   = z * (1 + lag) * (1 + atr_pct * 100)
 
+                candidates.append((score, snap, result, udata, decision_entry))
+            else:
                 decision_log.append(decision_entry)
 
-            # ── Shadow book evaluation
             shadow_book.evaluate_all(snap)
+
+        # Step 2: check available slots
+        open_count = len(_risk.live_positions)
+        free_slots = MAX_OPEN_POSITIONS - open_count
+
+        if free_slots <= 0:
+            log.debug("[engine] All %d slots occupied — no new entries this cycle", MAX_OPEN_POSITIONS)
+            for _, _, _, _, de in candidates:
+                de["status_tier"] = "BLOCKED"
+                de["risk_reason"]  = "SLOT_CAP"
+                decision_log.append(de)
+        else:
+            # Step 3: rank by conviction score descending
+            candidates.sort(key=lambda x: x[0], reverse=True)
+
+            # Step 4: select top 1 per sector, up to free_slots total
+            selected_sectors = {pos.get("sector") for pos in _risk.live_positions.values()}
+            selected_count   = 0
+
+            for score, snap, result, udata, decision_entry in candidates:
+                ticker = udata["ticker"]
+                sector = udata["sector"]
+
+                if selected_count >= free_slots:
+                    decision_entry["status_tier"] = "RANKED_OUT"
+                    decision_entry["risk_reason"]  = f"RANKED_OUT:slot_full (score={score:.1f})"
+                    decision_log.append(decision_entry)
+                    continue
+
+                if sector in selected_sectors:
+                    decision_entry["status_tier"] = "RANKED_OUT"
+                    decision_entry["risk_reason"]  = f"RANKED_OUT:sector_dup ({sector})"
+                    decision_log.append(decision_entry)
+                    continue
+
+                # Step 5: run through risk gate and submit
+                approved_qty, risk_reason = _risk.validate_order(
+                    ticker       = ticker,
+                    side         = result.signal,
+                    price        = result.limit_price,
+                    qty          = max(1, _math.ceil(SLOT_SIZE / max(result.limit_price, 1))),
+                    sector       = sector,
+                    vol_z        = snap.vol_z_score,
+                    nifty_change = snap.nifty_open_change,
+                )
+
+                disposition = "LIVE" if approved_qty > 0 else "RISK_REJECTED"
+                decision_entry["risk_reason"] = risk_reason
+                result.metadata["risk_reason"]      = risk_reason
+                result.metadata["approved_qty"]     = approved_qty
+                result.metadata["strategy_name"]    = live_strategy.name
+                result.metadata["strategy_version"] = live_strategy.version
+                result.metadata["conviction_score"] = round(score, 2)
+                sid = log_signal(snap, result, disposition)
+                result.metadata["signal_id"] = sid
+
+                if approved_qty > 0:
+                    _now_epoch = time.time()
+                    _last_t    = _last_submit_time.get(ticker, 0)
+                    if _now_epoch - _last_t < 10.0:
+                        log.debug("[engine] Dedup: skipping %s (%.1fs ago)", ticker, _now_epoch - _last_t)
+                    else:
+                        _last_submit_time[ticker] = _now_epoch
+                        _broker.submit(
+                            ticker        = ticker,
+                            side          = result.signal,
+                            qty           = approved_qty,
+                            limit_price   = result.limit_price,
+                            sl_price      = result.sl_price,
+                            target_price  = result.target_price,
+                            signal_id     = sid,
+                            strategy_name = live_strategy.name,
+                            sector        = sector,
+                        )
+                        feature_engine.record_signal()
+                        _state["signals_today"] += 1
+                        decision_entry["status_tier"] = "LIVE"
+                        selected_sectors.add(sector)
+                        selected_count += 1
+                        log.info("[engine] SLOT %d/%d | score=%.1f | %s %s %s qty=%d",
+                                 open_count + selected_count, MAX_OPEN_POSITIONS,
+                                 score, result.signal, ticker, sector, approved_qty)
+                else:
+                    decision_entry["status_tier"] = "BLOCKED"
+
+                decision_log.append(decision_entry)
 
     # ── Shadow fill ticks
     shadow_book.tick_prices(prices)

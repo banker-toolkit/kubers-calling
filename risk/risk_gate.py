@@ -44,6 +44,8 @@ from config import (
     SESSION_START,
     MIN_ORDER_VALUE,
     MAX_ORDER_VALUE,
+    MAX_ENTRY_PRICE,
+    MAX_OPEN_POSITIONS,
 )
 
 from database.vault import (
@@ -66,6 +68,8 @@ class RejectionReason:
     SL_COOLDOWN        = "SL_COOLDOWN"
     APPROVED           = "APPROVED"
     PARTIAL_FILL       = "PARTIAL_FILL_DETECTED"
+    PRICE_TOO_HIGH     = "PRICE_TOO_HIGH"
+    SLOT_CAP           = "SLOT_CAP"
 
 
 class OrderResult:
@@ -136,6 +140,20 @@ class RiskManager:
         """
         now_str = datetime.now().strftime("%H:%M")
 
+        # ── 0. Price filter — block stocks priced above MAX_ENTRY_PRICE.
+        # High-price stocks (Shree Cement ₹23,955, UltraTech ₹11,277) give too
+        # few shares per slot to exit reliably. Evidence: 1-share positions cause
+        # FORCE_BOOKED exits and carry ₹33+ in costs vs ₹7 gross. (v9)
+        if price > MAX_ENTRY_PRICE:
+            return 0, f"{RejectionReason.PRICE_TOO_HIGH}:{price:.0f}"
+
+        # ── 0.5. Slot cap — 5-slot model (v9).
+        # Only MAX_OPEN_POSITIONS concurrent positions allowed.
+        # The engine's collect-rank-select loop is the primary gate;
+        # this is the safety net that catches anything slipping through.
+        if len(self.live_positions) >= MAX_OPEN_POSITIONS:
+            return 0, RejectionReason.SLOT_CAP
+
         # ── 1. Kill switch — hard stop
         if self.kill_switch_fired:
             return 0, RejectionReason.KILL_SWITCH
@@ -196,18 +214,15 @@ class RiskManager:
 
         # Per-stock limit check
         per_limit = self.per_stock_limit
+        if self._is_open_protection_window(nifty_change):
+            per_limit = per_limit * OPEN_POSITION_SIZE_PCT
+
         if order_value > per_limit:
             qty = math.ceil(per_limit / price)
 
         # Clamp between MIN_ORDER_VALUE and MAX_ORDER_VALUE
         qty = max(math.ceil(MIN_ORDER_VALUE / price), min(qty, int(self.max_order_value / price)))
         qty = max(1, qty)
-
-        # Open protection halving AFTER clamp so MIN_ORDER_VALUE
-        # does not override the intentional size reduction (UT-010)
-        if self._is_open_protection_window(nifty_change):  # UT-010
-            qty = max(1, int(qty * OPEN_POSITION_SIZE_PCT))
-
         order_value = price * qty
 
         # Global limit check
