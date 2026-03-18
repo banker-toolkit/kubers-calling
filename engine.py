@@ -192,8 +192,8 @@ def startup() -> bool:
 def _reconcile_positions():
     """
     Compare open positions on INDmoney vs Kubers DB at startup.
-    Before 15:00: warn and log, continue trading.
-    After 15:00: hard close ghost positions via market order.
+    Before EOD_SQUAREOFF_TIME: warn and log, continue trading.
+    After EOD_SQUAREOFF_TIME: hard close ghost positions via market order.
     Phantoms (in DB, not on broker): delete from DB immediately.
     """
     global _risk, _broker

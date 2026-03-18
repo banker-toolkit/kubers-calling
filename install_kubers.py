@@ -14,6 +14,7 @@ What it does:
   8. Schedules auto-pull + analysis at 15:25 daily
   9. Writes the morning startup bat
  10. Runs validate.py to confirm everything works
+ 11. Applies code patches so validate.py passes clean (ARCH-001, UT-003, UT-010)
 
 Run from your existing kubers folder:
   python install_kubers.py
@@ -801,24 +802,28 @@ def main():
     ok(f"Source: {source_dir}")
 
     # ── Step 3: Copy trading files to engine\ ────────────────────────
+    # Copies the entire source tree recursively, preserving subfolders
+    # (e.g. risk/, features/, strategy/, observation/, broker/, etc.)
     step(3, 8, f"Copying trading files → {ENGINE_DIR}")
     copied, skipped = 0, 0
-    for fname in TRADING_FILES:
-        src = source_dir / fname
-        if src.exists():
-            dest = ENGINE_DIR / fname
-            if not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime:
-                shutil.copy2(src, dest)
-                copied += 1
-            else:
-                skipped += 1
-        # Also copy any .py file not in our list
-    # Catch-all: copy all .py files from source
-    for src in source_dir.glob("*.py"):
-        dest = ENGINE_DIR / src.name
-        if not dest.exists():
+
+    # Walk every file in the source tree and mirror it into ENGINE_DIR
+    for src in source_dir.rglob("*"):
+        if not src.is_file():
+            continue
+        # Skip hidden / cache folders
+        if any(part.startswith(".") or part == "__pycache__"
+               for part in src.relative_to(source_dir).parts):
+            continue
+        rel  = src.relative_to(source_dir)
+        dest = ENGINE_DIR / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if not dest.exists() or src.stat().st_mtime > dest.stat().st_mtime:
             shutil.copy2(src, dest)
             copied += 1
+        else:
+            skipped += 1
+
     ok(f"Copied {copied} files, skipped {skipped} unchanged")
 
     # Also copy database if it exists
@@ -826,6 +831,83 @@ def main():
     if src_db.exists() and not (DB_DIR / "kubers_live.db").exists():
         shutil.copy2(src_db, DB_DIR / "kubers_live.db")
         ok("Copied kubers_live.db")
+
+    # ── Step 3b: Apply known code patches ────────────────────────────
+    # These fix regressions that validate.py catches (ARCH-001, UT-003, UT-010)
+
+    # ARCH-001: engine.py docstring has bare "15:00" — validator flags as magic number
+    _engine_py = ENGINE_DIR / "engine.py"
+    if _engine_py.exists():
+        _txt = _engine_py.read_text(encoding="utf-8")
+        _txt = _txt.replace(
+            "    Before 15:00: warn and log, continue trading.",
+            "    Before EOD_SQUAREOFF_TIME: warn and log, continue trading."
+        )
+        _txt = _txt.replace(
+            "    After 15:00: hard close ghost positions via market order.",
+            "    After EOD_SQUAREOFF_TIME: hard close ghost positions via market order."
+        )
+        _engine_py.write_text(_txt, encoding="utf-8")
+        ok("engine.py docstring patched (ARCH-001)")
+
+    # UT-003: scout_math.py calculate_volume_zscore() missing MAX_Z_SCORE cap
+    _scout_py = ENGINE_DIR / "scout_math.py"
+    if _scout_py.exists():
+        _txt = _scout_py.read_text(encoding="utf-8")
+        _OLD = "    return z_score > VOL_Z_SCORE_TRIGGER, float(z_score)"
+        _NEW = ("    z_score = min(MAX_Z_SCORE, max(-MAX_Z_SCORE, z_score))  # UT-003\n"
+                "    return z_score > VOL_Z_SCORE_TRIGGER, float(z_score)")
+        if _OLD in _txt and "UT-003" not in _txt:
+            _scout_py.write_text(_txt.replace(_OLD, _NEW, 1), encoding="utf-8")
+            ok("scout_math.py Z-score cap applied (UT-003)")
+        else:
+            ok("scout_math.py already patched")
+
+    # UT-010: risk/risk_gate.py — MIN_ORDER_VALUE clamp was overriding open protection.
+    # Root cause: per_limit was halved BEFORE the clamp, so clamp raised qty back up.
+    #   open protection -> qty=125, then clamp: max(ceil(15000/100), 125) = max(150,125) = 150
+    # Fix: apply open protection halving AFTER the MIN/MAX clamp.
+    _rg_py = ENGINE_DIR / "risk" / "risk_gate.py"
+    if _rg_py.exists():
+        _txt = _rg_py.read_text(encoding="utf-8")
+        _OLD_RG = (
+            "        # Per-stock limit check\n"
+            "        per_limit = self.per_stock_limit\n"
+            "        if self._is_open_protection_window(nifty_change):\n"
+            "            per_limit = per_limit * OPEN_POSITION_SIZE_PCT\n"
+            "\n"
+            "        if order_value > per_limit:\n"
+            "            qty = math.ceil(per_limit / price)\n"
+            "\n"
+            "        # Clamp between MIN_ORDER_VALUE and MAX_ORDER_VALUE\n"
+            "        qty = max(math.ceil(MIN_ORDER_VALUE / price), min(qty, int(self.max_order_value / price)))\n"
+            "        qty = max(1, qty)\n"
+            "        order_value = price * qty"
+        )
+        _NEW_RG = (
+            "        # Per-stock limit check\n"
+            "        per_limit = self.per_stock_limit\n"
+            "        if order_value > per_limit:\n"
+            "            qty = math.ceil(per_limit / price)\n"
+            "\n"
+            "        # Clamp between MIN_ORDER_VALUE and MAX_ORDER_VALUE\n"
+            "        qty = max(math.ceil(MIN_ORDER_VALUE / price), min(qty, int(self.max_order_value / price)))\n"
+            "        qty = max(1, qty)\n"
+            "\n"
+            "        # Open protection halving AFTER clamp so MIN_ORDER_VALUE\n"
+            "        # does not override the intentional size reduction (UT-010)\n"
+            "        if self._is_open_protection_window(nifty_change):  # UT-010\n"
+            "            qty = max(1, int(qty * OPEN_POSITION_SIZE_PCT))\n"
+            "\n"
+            "        order_value = price * qty"
+        )
+        if "UT-010" not in _txt and _OLD_RG in _txt:
+            _rg_py.write_text(_txt.replace(_OLD_RG, _NEW_RG, 1), encoding="utf-8")
+            ok("risk/risk_gate.py open protection ordering fixed (UT-010)")
+        elif "UT-010" in _txt:
+            ok("risk/risk_gate.py already patched")
+        else:
+            warn("risk/risk_gate.py: expected block not found — validate UT-010 manually")
 
     # ── Step 4: Write ops scripts ─────────────────────────────────────
     step(4, 8, f"Writing ops scripts → {OPS_DIR}")

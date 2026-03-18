@@ -196,15 +196,18 @@ class RiskManager:
 
         # Per-stock limit check
         per_limit = self.per_stock_limit
-        if self._is_open_protection_window(nifty_change):
-            per_limit = per_limit * OPEN_POSITION_SIZE_PCT
-
         if order_value > per_limit:
             qty = math.ceil(per_limit / price)
 
         # Clamp between MIN_ORDER_VALUE and MAX_ORDER_VALUE
         qty = max(math.ceil(MIN_ORDER_VALUE / price), min(qty, int(self.max_order_value / price)))
         qty = max(1, qty)
+
+        # Open protection halving AFTER clamp so MIN_ORDER_VALUE
+        # does not override the intentional size reduction (UT-010)
+        if self._is_open_protection_window(nifty_change):  # UT-010
+            qty = max(1, int(qty * OPEN_POSITION_SIZE_PCT))
+
         order_value = price * qty
 
         # Global limit check

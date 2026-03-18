@@ -1,1 +1,6 @@
-{"global_limit": 100000, "per_stock_limit": 10000, "equity_floor": 90000, "notes": "Change these via the dashboard. equity_floor = kill switch trigger."}
+{
+  "global_limit": 100000,
+  "per_stock_limit": 25000,
+  "equity_floor": 90000,
+  "notes": "Change these via the dashboard. equity_floor = kill switch trigger."
+}

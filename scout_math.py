@@ -76,6 +76,7 @@ def calculate_volume_zscore(candles: list,
     if abs(z_score) > 20:
         _scout_log.warning("[scout] High Z-score: %s bucket=%s z=%.1f vol=%.0f mean=%.0f std=%.0f",
                            "unknown", "unknown", z_score, current_vol, mean_v, std_v)
+    z_score = min(MAX_Z_SCORE, max(-MAX_Z_SCORE, z_score))  # UT-003
     return z_score > VOL_Z_SCORE_TRIGGER, float(z_score)
 
 
