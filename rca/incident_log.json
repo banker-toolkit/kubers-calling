@@ -1,0 +1,1424 @@
+[
+  {
+    "id": "DIVERGENCE_20260316_231736",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BANDHANBNK",
+      "IRB"
+    ],
+    "timestamp": "2026-03-16T23:17:36.993608",
+    "evidence": {},
+    "status": "investigating",
+    "rca": null,
+    "confidence": 0.0,
+    "rounds": [],
+    "pattern_match": null,
+    "proposed_fix": null,
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260316_232404",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BANDHANBNK",
+      "IRB"
+    ],
+    "timestamp": "2026-03-16T23:24:04.142215",
+    "evidence": {},
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_124334",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "HINDUNILVR"
+    ],
+    "timestamp": "2026-03-17T12:43:34.397233",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_124434",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "PIDILITIND"
+    ],
+    "timestamp": "2026-03-17T12:44:34.442816",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_124534",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "RBLBANK"
+    ],
+    "timestamp": "2026-03-17T12:45:34.416586",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_124634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "MOTHERSON"
+    ],
+    "timestamp": "2026-03-17T12:46:34.429257",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_125034",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "JSWSTEEL"
+    ],
+    "timestamp": "2026-03-17T12:50:34.459515",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_125234",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "IRCTC"
+    ],
+    "timestamp": "2026-03-17T12:52:34.419932",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_125434",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "KPITTECH"
+    ],
+    "timestamp": "2026-03-17T12:54:34.313511",
+    "evidence": {
+      "kubers_stage": "TARGET",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "AUROPHARMA"
+    ],
+    "timestamp": "2026-03-17T13:16:34.569515",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131636",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BPCL"
+    ],
+    "timestamp": "2026-03-17T13:16:36.590318",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131638",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "CIPLA"
+    ],
+    "timestamp": "2026-03-17T13:16:38.614764",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131640",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "DRREDDY"
+    ],
+    "timestamp": "2026-03-17T13:16:40.634489",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131642",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "LUPIN"
+    ],
+    "timestamp": "2026-03-17T13:16:42.652160",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131644",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "YESBANK"
+    ],
+    "timestamp": "2026-03-17T13:16:44.666732",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_131646",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BAJFINANCE"
+    ],
+    "timestamp": "2026-03-17T13:16:46.688258",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_132634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "ATUL"
+    ],
+    "timestamp": "2026-03-17T13:26:34.551172",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_133334",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "GNFC"
+    ],
+    "timestamp": "2026-03-17T13:33:34.363331",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_134634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BHARATFORG"
+    ],
+    "timestamp": "2026-03-17T13:46:34.303833",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_135134",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "TIMKEN"
+    ],
+    "timestamp": "2026-03-17T13:51:34.301812",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_141134",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "FEDERALBNK"
+    ],
+    "timestamp": "2026-03-17T14:11:34.415008",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_141307",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "VGUARD"
+    ],
+    "timestamp": "2026-03-17T14:13:07.127593",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_141534",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "KPITTECH"
+    ],
+    "timestamp": "2026-03-17T14:15:34.483657",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_141536",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "OBEROIRLTY"
+    ],
+    "timestamp": "2026-03-17T14:15:36.485260",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_142534",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "COFORGE"
+    ],
+    "timestamp": "2026-03-17T14:25:34.453898",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_144634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "NOCIL"
+    ],
+    "timestamp": "2026-03-17T14:46:34.423708",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145234",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "GNFC"
+    ],
+    "timestamp": "2026-03-17T14:52:34.430706",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145236",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "HINDALCO"
+    ],
+    "timestamp": "2026-03-17T14:52:36.441830",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145238",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "IPCALAB"
+    ],
+    "timestamp": "2026-03-17T14:52:38.448843",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145434",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "ATUL"
+    ],
+    "timestamp": "2026-03-17T14:54:34.368701",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "MHRIL"
+    ],
+    "timestamp": "2026-03-17T14:56:34.403213",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145734",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "RELIANCE"
+    ],
+    "timestamp": "2026-03-17T14:57:34.413438",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_145934",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "AXISBANK"
+    ],
+    "timestamp": "2026-03-17T14:59:34.457011",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_150334",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "TATACONSUM"
+    ],
+    "timestamp": "2026-03-17T15:03:34.371886",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_150434",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BPCL"
+    ],
+    "timestamp": "2026-03-17T15:04:34.415955",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_150436",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "RELIANCE"
+    ],
+    "timestamp": "2026-03-17T15:04:36.432223",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_150534",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BAJAJ-AUTO"
+    ],
+    "timestamp": "2026-03-17T15:05:34.367969",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151534",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "CHOLAFIN"
+    ],
+    "timestamp": "2026-03-17T15:15:34.363677",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151536",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "GSFC"
+    ],
+    "timestamp": "2026-03-17T15:15:36.368925",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151538",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "NESTLEIND"
+    ],
+    "timestamp": "2026-03-17T15:15:38.397133",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151634",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "IGL"
+    ],
+    "timestamp": "2026-03-17T15:16:34.401835",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151636",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "PETRONET"
+    ],
+    "timestamp": "2026-03-17T15:16:36.416135",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151734",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "MGL"
+    ],
+    "timestamp": "2026-03-17T15:17:34.357771",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151834",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "AIAENG"
+    ],
+    "timestamp": "2026-03-17T15:18:34.357282",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151836",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "GNFC"
+    ],
+    "timestamp": "2026-03-17T15:18:36.381619",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260317_151838",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "HINDZINC"
+    ],
+    "timestamp": "2026-03-17T15:18:38.391149",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_095644",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "JKCEMENT"
+    ],
+    "timestamp": "2026-03-18T09:56:44.825120",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_100359",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "WHIRLPOOL"
+    ],
+    "timestamp": "2026-03-18T10:03:59.949937",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_101235",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "ULTRACEMCO"
+    ],
+    "timestamp": "2026-03-18T10:12:35.824541",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_101335",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "SHREECEM"
+    ],
+    "timestamp": "2026-03-18T10:13:35.953323",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_101535",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "WHIRLPOOL"
+    ],
+    "timestamp": "2026-03-18T10:15:35.884409",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_102309",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "AMBER"
+    ],
+    "timestamp": "2026-03-18T10:23:09.941089",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_102435",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "ENDURANCE"
+    ],
+    "timestamp": "2026-03-18T10:24:35.925935",
+    "evidence": {
+      "kubers_stage": "TIME_STOP",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104454",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "MUTHOOTFIN"
+    ],
+    "timestamp": "2026-03-18T10:44:54.764472",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104456",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "SBIN"
+    ],
+    "timestamp": "2026-03-18T10:44:56.777180",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104458",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "SHRIRAMFIN"
+    ],
+    "timestamp": "2026-03-18T10:44:58.796700",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104524",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "THERMAX"
+    ],
+    "timestamp": "2026-03-18T10:45:24.826973",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104526",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "VOLTAS"
+    ],
+    "timestamp": "2026-03-18T10:45:26.842032",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104528",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "WIPRO"
+    ],
+    "timestamp": "2026-03-18T10:45:28.859817",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104635",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "TITAN"
+    ],
+    "timestamp": "2026-03-18T10:46:35.879445",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104835",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "BAJAJ-AUTO"
+    ],
+    "timestamp": "2026-03-18T10:48:35.915985",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_104837",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "VEDL"
+    ],
+    "timestamp": "2026-03-18T10:48:37.931930",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_105535",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "NATIONALUM"
+    ],
+    "timestamp": "2026-03-18T10:55:35.764081",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_110835",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "INDUSTOWER"
+    ],
+    "timestamp": "2026-03-18T11:08:35.834559",
+    "evidence": {
+      "kubers_stage": "SL_HIT",
+      "indmoney_stage": "HOLDING",
+      "in_kubers_db_positions": false,
+      "in_indmoney_positions": true
+    },
+    "status": "pattern_matched",
+    "rca": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "MIN_ORDER_VALUE_REJECTION",
+    "proposed_fix": "[FIXED 2026-03-16] Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+    "affected_file": null,
+    "approved": false
+  },
+  {
+    "id": "DIVERGENCE_20260318_113335",
+    "type": "DIVERGENCE",
+    "tickers": [
+      "NESTLEIND"
+    ],
+    "timestamp": "2026-03-18T11:33:35.774266",
+    "evidence": {
+      "kubers_stage": "HOLDING",
+      "indmoney_stage": "NONE",
+      "in_kubers_db_positions": true,
+      "in_indmoney_positions": false
+    },
+    "status": "pattern_matched",
+    "rca": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+    "confidence": 1.0,
+    "rounds": [],
+    "pattern_match": "INSTANT_SL_FIRE",
+    "proposed_fix": "[FIXED 2026-03-16] Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+    "affected_file": null,
+    "approved": false
+  }
+]

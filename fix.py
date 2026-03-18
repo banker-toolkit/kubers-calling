@@ -1,0 +1,5 @@
+src=open('execution/broker.py',encoding='utf-8').read() 
+src=src.replace('entry_time=datetime.fromisoformat(et) if et else datetime.now()','entry_time=datetime.fromisoformat(et).timestamp() if et else time.time()') 
+src=src.replace('import sqlite3, logging','import sqlite3, logging, time') 
+open('execution/broker.py','w',encoding='utf-8').write(src) 
+print('FIXED') 

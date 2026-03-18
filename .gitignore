@@ -1,0 +1,11 @@
+investright_creds.json
+*.db
+*.db-wal
+*.db-shm
+*.log
+*.bak*
+__pycache__/
+deploy/
+*.pyc
+trade_log_*.csv
+signal_log_*.csv

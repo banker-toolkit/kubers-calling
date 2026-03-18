@@ -1,0 +1,151 @@
+{
+  "version": "1.0",
+  "last_updated": "2026-03-16",
+  "description": "Kubers Calling RCA knowledge base. Every confirmed root cause lives here. Agent reads this before every diagnostic to avoid re-investigating known patterns.",
+  "patterns": [
+    {
+      "id": "INSTANT_SL_FIRE",
+      "title": "SL order fires instantly at entry price",
+      "category": "execution",
+      "confirmed_date": "2026-03-16",
+      "confidence": 1.0,
+      "recurrence_count": 1,
+      "signature": {
+        "exit_reason": "SL_HIT",
+        "exit_price_equals_entry_price": true,
+        "hold_minutes_lt": 2.0,
+        "gross_pnl": 0.0
+      },
+      "evidence": {
+        "db_query": "SELECT COUNT(*) FROM trade_log WHERE exit_reason='SL_HIT' AND ABS(exit_price-entry_price)<0.01 AND hold_minutes<2",
+        "confirmed_count": 32,
+        "total_loss_rs": 607.12,
+        "spans_dates": [
+          "2026-03-13",
+          "2026-03-16"
+        ]
+      },
+      "root_cause": "place_sl_order() in execution/broker.py sends order_type=LIMIT at the SL trigger price. INDstocks /order API only supports LIMIT and MARKET \u2014 there is no SL-M for equity intraday. A LIMIT SELL at 18.46 when market price is 18.55 is immediately marketable and fills instantly.",
+      "affected_file": "execution/broker.py",
+      "affected_function": "poll_pending",
+      "fix_applied": "Removed place_sl_order() call entirely. SL now monitored by engine evaluate_exits() every 2.5s via price-based check.",
+      "fix_date": "2026-03-16",
+      "interrogation_rounds": 3,
+      "key_challenge": "Exit price equals entry price exactly \u2014 price never moved. If SL was triggered by price reaching sl_price, exit_price should be at sl_price not entry_price."
+    },
+    {
+      "id": "GHOST_POSITION_STARTUP",
+      "title": "Positions open on INDmoney but absent from Kubers DB",
+      "category": "reconciliation",
+      "confirmed_date": "2026-03-16",
+      "confidence": 1.0,
+      "recurrence_count": 1,
+      "signature": {
+        "in_indmoney_positions": true,
+        "in_kubers_db_positions": false,
+        "entry_narrative_empty": true
+      },
+      "evidence": {
+        "ghost_tickers": [
+          "CERA",
+          "ULTRACEMCO",
+          "PETRONET",
+          "IOC",
+          "BAJAJFINSV",
+          "ENDURANCE",
+          "BHEL",
+          "INDUSTOWER",
+          "JKCEMENT"
+        ],
+        "cause": "Engine started at 13:00 with fresh DB. Morning session positions survived on INDmoney."
+      },
+      "root_cause": "Engine started mid-day with a fresh DB. Prior session positions survived on INDmoney. Engine was completely blind \u2014 no SL monitoring, no time stop, no EOD close from Kubers. force_close_ticker() failed because tickers were not in the token map for the new session.",
+      "affected_file": "engine.py",
+      "affected_function": "startup",
+      "fix_applied": "_reconcile_positions() added to end of startup(). Compares broker positions vs DB. Warns before 15:00, auto-closes after 15:00 via place_market_order().",
+      "fix_date": "2026-03-16",
+      "interrogation_rounds": 4,
+      "key_challenge": "All ghost trades had blank entry_narrative. Blank = position loaded from DB on startup not from live signal \u2014 confirmed it was a prior session."
+    },
+    {
+      "id": "MIN_ORDER_VALUE_REJECTION",
+      "title": "Orders rejected as below MIN_ORDER_VALUE despite correct per_stock_limit",
+      "category": "sizing",
+      "confirmed_date": "2026-03-16",
+      "confidence": 1.0,
+      "recurrence_count": 1,
+      "signature": {
+        "log_contains": "below MIN_ORDER_VALUE",
+        "order_value_slightly_below_threshold": true
+      },
+      "evidence": {
+        "examples": [
+          "PIDILITIND qty=11 price=1342.40 value=14766 vs MIN=15000",
+          "ABB qty=2 price=6184 value=12368 vs MIN=15000"
+        ]
+      },
+      "root_cause": "risk_gate.py used int() (floor division) for qty = int(per_stock_limit/price). Floor division structurally guarantees order value is always <= per_stock_limit, often below MIN_ORDER_VALUE. PIDILITIND: int(15000/1342.40)=11, 11*1342.40=14766 < 15000.",
+      "affected_file": "risk/risk_gate.py",
+      "affected_function": "validate_order",
+      "fix_applied": "Changed int() to math.ceil(). Added min/max clamp. Added MAX_ORDER_VALUE=45000 to config.py.",
+      "fix_date": "2026-03-16",
+      "interrogation_rounds": 1,
+      "key_challenge": "N/A \u2014 arithmetic was immediately obvious from the log."
+    }
+  ],
+  "open_investigations": [
+    {
+      "id": "SHADOW_BOOK_FILL_BUG",
+      "title": "Shadow book tick_prices() Phase 1 fills processed in Phase 2 of same call",
+      "status": "fix_written_not_verified",
+      "description": "Positions filled in Phase 1 are immediately iterated in Phase 2 of the same tick_prices() call.",
+      "proposed_fix": "Snapshot _pending before iterating: list(self._pending.items())",
+      "fix_status": "Written in session, not yet deployed"
+    }
+  ],
+  "system_facts": {
+    "broker_api": {
+      "name": "INDstocks",
+      "base_url": "https://api.indstocks.com",
+      "order_types_supported": [
+        "LIMIT",
+        "MARKET"
+      ],
+      "no_sl_order_type": true,
+      "no_equity_smart_orders": true,
+      "positions_endpoint": "GET /portfolio/positions?segment=equity&product=intraday",
+      "token_expires": "daily"
+    },
+    "architecture": {
+      "orchestrator": "engine.py",
+      "config": "config.py \u2014 single source of truth",
+      "shadow_book": "strategy/shadow_book.py \u2014 simulation only, never places real orders",
+      "db_path": "database/kubers_live.db",
+      "db_tables": [
+        "positions",
+        "trade_log",
+        "signal_log",
+        "shadow_log"
+      ]
+    },
+    "cost_model": {
+      "brokerage_per_order_rs": 5.0,
+      "stt_pct": 0.00025,
+      "exchange_pct": 2.97e-05,
+      "sebi_pct": 1e-06,
+      "stamp_pct": 3e-05,
+      "gst_pct": 0.18,
+      "dp_rs": 0.0
+    },
+    "key_thresholds": {
+      "MIN_ORDER_VALUE": 15000,
+      "MAX_ORDER_VALUE": 45000,
+      "DEFAULT_PER_STOCK_LIMIT": 15000,
+      "DEFAULT_GLOBAL_LIMIT": 100000,
+      "SL_COOLDOWN_MIN": 30,
+      "TIME_STOP_HARD_MIN": 30,
+      "EOD_SQUAREOFF_TIME": "15:15",
+      "SCAN_INTERVAL_SEC": 2.5
+    }
+  }
+}
