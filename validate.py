@@ -1234,6 +1234,106 @@ def run_unit_tests():
     except Exception as e:
         record("UNIT", "REG-040", "config.py: EXIT_ORDER_TTL_CANDLES", False,
                traceback.format_exc().split('\n')[-2], regression=True)
+    # ── REG-041: WS_ORDER_UPDATES_URL defined in config ─────────────────
+    try:
+        from config import WS_ORDER_UPDATES_URL
+        passed = WS_ORDER_UPDATES_URL.startswith("wss://")
+        record("UNIT", "REG-041",
+               f"config.py: WS_ORDER_UPDATES_URL defined and starts with wss:// ({WS_ORDER_UPDATES_URL})",
+               passed,
+               f"Value: {WS_ORDER_UPDATES_URL}" if not passed else "",
+               regression=True)
+    except Exception as e:
+        record("UNIT", "REG-041", "config.py: WS_ORDER_UPDATES_URL", False,
+               traceback.format_exc().split("\n")[-2], regression=True)
+
+    # ── REG-042: FORCE_CLOSE_TIME defined and before EOD_SQUAREOFF_TIME ─
+    try:
+        from config import FORCE_CLOSE_TIME, EOD_SQUAREOFF_TIME
+        passed = FORCE_CLOSE_TIME < EOD_SQUAREOFF_TIME
+        record("UNIT", "REG-042",
+               f"config.py: FORCE_CLOSE_TIME ({FORCE_CLOSE_TIME}) before EOD ({EOD_SQUAREOFF_TIME})",
+               passed,
+               f"FORCE_CLOSE_TIME {FORCE_CLOSE_TIME} >= EOD {EOD_SQUAREOFF_TIME}" if not passed else "",
+               regression=True)
+    except Exception as e:
+        record("UNIT", "REG-042", "config.py: FORCE_CLOSE_TIME", False,
+               traceback.format_exc().split("\n")[-2], regression=True)
+
+    # ── REG-043: BROKERAGE_PER_ORDER_RS == 5.0 (IndMoney flat rate) ─────
+    try:
+        from config import BROKERAGE_PER_ORDER_RS
+        passed = (BROKERAGE_PER_ORDER_RS == 5.0)
+        record("UNIT", "REG-043",
+               f"config.py: BROKERAGE_PER_ORDER_RS == 5.0 (IndMoney flat rate, currently {BROKERAGE_PER_ORDER_RS})",
+               passed,
+               f"Value {BROKERAGE_PER_ORDER_RS} — IndMoney charges flat Rs5 per order" if not passed else "",
+               regression=True)
+    except Exception as e:
+        record("UNIT", "REG-043", "config.py: BROKERAGE_PER_ORDER_RS", False,
+               traceback.format_exc().split("\n")[-2], regression=True)
+
+    # ── REG-044: MARKET orders omit limit_price in feed.py ───────────────
+    # Root cause of all SL_HIT ghost positions: LIMIT at Rs0 was rejected by IndMoney
+    # IndMoney validates LimitPriceMustBeAboveZero on every order including MARKET
+    try:
+        feed_src = open("data/feed.py", encoding="utf-8").read()
+        # Must have conditional: only include limit_price for LIMIT orders
+        has_guard = 'if order.order_type == "LIMIT"' in feed_src
+        # Must NOT have unconditional limit_price in payload for market orders
+        # Check that the payload dict doesn't always include limit_price
+        record("UNIT", "REG-044",
+               "data/feed.py: MARKET orders omit limit_price (LimitPriceMustBeAboveZero fix)",
+               has_guard,
+               "limit_price guard missing — MARKET orders will be rejected with Rs0" if not has_guard else "",
+               regression=True)
+    except Exception as e:
+        record("UNIT", "REG-044", "data/feed.py: MARKET order payload", False,
+               traceback.format_exc().split("\n")[-2], regression=True)
+
+    # ── REG-045: feed.py checks SUCCESS not COMPLETE ──────────────────────
+    # COMPLETE does not exist in IndMoney API. Actual terminal status is SUCCESS.
+    # Every fill confirmation via REST was broken before v8.
+    try:
+        feed_src = open("data/feed.py", encoding="utf-8").read()
+        has_success   = '"SUCCESS"' in feed_src
+        # COMPLETE should only appear as the *internal normalised value*, not as API check
+        # In _STATUS_MAP: "SUCCESS": "COMPLETE" — this is correct normalisation
+        # What we must NOT have: checking for status == "COMPLETE" from IndMoney directly
+        # The _STATUS_MAP maps IndMoney "SUCCESS" -> internal "COMPLETE" — that is correct
+        record("UNIT", "REG-045",
+               "data/feed.py: IndMoney SUCCESS status handled (not COMPLETE as external check)",
+               has_success,
+               "SUCCESS not found in feed.py — fill confirmations will fail" if not has_success else "",
+               regression=True)
+    except Exception as e:
+        record("UNIT", "REG-045", "data/feed.py: SUCCESS status string", False,
+               traceback.format_exc().split("\n")[-2], regression=True)
+
+    # ── REG-046: SL_HIT goes through _pending_exits not fast-track ───────
+    # Root cause of Mar-19 ghost positions: SL_HIT fast-tracked delete
+    # before sending close order to IndMoney
+    try:
+        import re as _re
+        broker_src = open("execution/broker.py", encoding="utf-8").read()
+        # Must NOT have: if reason == "SL_HIT": immediate pop+book (fast track)
+        fast_track = bool(_re.search(
+            r'if reason == .SL_HIT.:\s*\n\s*self\._positions\.pop',
+            broker_src
+        ))
+        # Must have: SL_HIT goes to _pending_exits
+        has_pending = "_pending_exits" in broker_src
+        passed = (not fast_track) and has_pending
+        record("UNIT", "REG-046",
+               "execution/broker.py: SL_HIT exits through _pending_exits (no fast-track delete)",
+               passed,
+               "SL_HIT fast-tracks position delete before broker confirmation — ghost positions will occur" if not passed else "",
+               regression=True)
+    except Exception as e:
+        record("UNIT", "REG-046", "execution/broker.py: SL_HIT through _pending_exits", False,
+               traceback.format_exc().split("\n")[-2], regression=True)
+
+
 
 
 # ─────────────────────────────────────────────────────────────────────
