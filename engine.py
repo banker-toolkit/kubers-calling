@@ -45,7 +45,7 @@ from config import (
 )
 
 from database.vault       import init_live_db, init_decisions_db
-from data.feed            import load_token, verify_connection, forge_token_map, fetch_nifty_data, fetch_vix, fetch_quotes, fetch_broker_positions, place_market_order
+from data.feed            import load_token, verify_connection, forge_token_map, fetch_nifty_data, fetch_vix, fetch_quotes, fetch_broker_positions, place_market_order, start_order_ws
 from data.candle_factory  import candle_store
 from data.history_store   import load_into_factory
 from features.feature_engine import FeatureEngine, RegimeState, feature_engine, _compute_atr
@@ -180,6 +180,15 @@ def startup() -> bool:
     else:
         log.info("[startup] NIFTY/VIX not yet available (pre-market) — "
                  "engine will enter STANDBY until market opens")
+    # Start WebSocket order updates listener (primary fill confirmation channel)
+    # Token is valid all day — connection opened once, stays open.
+    # Falls back to REST polling transparently if WS unavailable.
+    try:
+        start_order_ws()
+        log.info("[startup] Order WebSocket started")
+    except Exception as e:
+        log.warning("[startup] Order WebSocket failed to start (REST fallback active): %s", e)
+
     _state["running"] = True
 
     # Startup reconciliation — compare broker vs DB
@@ -332,6 +341,14 @@ def run_cycle():
     no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF)
     if no_new_entries:
         log.info("[engine] %s reached — no new entries. Exits and fills still active.", NO_NEW_ENTRIES_CUTOFF)
+
+    # ── 15:10 force close — Kubers proactive squareoff (before IndMoney 15:20)
+    # Applies to ALL positions including residuals.
+    if now_str >= FORCE_CLOSE_TIME and not getattr(_broker, '_force_close_fired', False):
+        log.warning("[engine] FORCE_CLOSE_TIME %s reached — closing all positions", FORCE_CLOSE_TIME)
+        _broker._force_close_fired = True
+        _broker.force_close_all(reason="FORCE_CLOSE")
+        _state["positions"] = []
 
     if regime != RegimeState.STANDBY and not _risk.kill_switch_fired and not no_new_entries:
 
