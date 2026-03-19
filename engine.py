@@ -407,8 +407,9 @@ def run_cycle():
             if result.is_trade:
                 decision_entry["status_tier"] = "SIGNAL"
 
-                # Skip tickers already open — no doubling up
-                if ticker in _risk.live_positions:
+                # Skip tickers already open or recently submitted (dedup)
+                _now_check = time.time()
+                if ticker in _risk.live_positions or (_now_check - _last_submit_time.get(ticker, 0)) < 60.0:
                     decision_entry["status_tier"] = "BLOCKED"
                     decision_entry["risk_reason"]  = "ALREADY_OPEN"
                     decision_log.append(decision_entry)
@@ -428,8 +429,11 @@ def run_cycle():
 
             shadow_book.evaluate_all(snap)
 
-        # Step 2: check available slots
-        open_count = len(_risk.live_positions)
+        # Step 2: check available slots.
+        # CRITICAL: count pending entry orders as occupied slots too.
+        # Without this, slow cycles (>2.5s) cause the engine to fire duplicate
+        # orders before the first fill is confirmed — creating 6+ positions.
+        open_count = len(_risk.live_positions) + _broker.get_pending_count()
         free_slots = MAX_OPEN_POSITIONS - open_count
 
         if free_slots <= 0:
@@ -486,7 +490,7 @@ def run_cycle():
                 if approved_qty > 0:
                     _now_epoch = time.time()
                     _last_t    = _last_submit_time.get(ticker, 0)
-                    if _now_epoch - _last_t < 10.0:
+                    if _now_epoch - _last_t < 60.0:
                         log.debug("[engine] Dedup: skipping %s (%.1fs ago)", ticker, _now_epoch - _last_t)
                     else:
                         _last_submit_time[ticker] = _now_epoch
@@ -523,13 +527,16 @@ def run_cycle():
     _broker.evaluate_exits(prices)
 
     # ── Update dashboard state
-    open_pos = _broker.get_open_positions(current_prices=prices)
-    _state["positions"]        = open_pos
-    _state["session_pnl"]      = _risk.session_pnl
-    _state["decision_log"]     = decision_log[-50:]  # last 50 for dashboard
-    _state["tickers_count"]    = len(tickers)
-    _state["deployed_capital"] = sum(p["entry_price"] * p["qty"] for p in open_pos)
-    _state["pending_exits"]    = _broker.get_pending_exits_count()  # exits awaiting fill confirmation
+    open_pos      = _broker.get_open_positions(current_prices=prices)
+    closing_pos   = _broker.get_pending_exits_detail()
+    all_pos       = open_pos + closing_pos
+    _state["positions"]            = all_pos
+    _state["session_pnl"]          = _risk.session_pnl
+    _state["decision_log"]         = decision_log[-50:]
+    _state["tickers_count"]        = len(tickers)
+    _state["deployed_capital"]     = sum(p["entry_price"] * p["qty"] for p in open_pos)
+    _state["pending_exits"]        = _broker.get_pending_exits_count()
+    _state["pending_exits_detail"] = closing_pos
 
     # ── EOD dossier trigger
     now_str = datetime.now().strftime("%H:%M")
@@ -579,11 +586,20 @@ def get_state() -> dict:
 
 def update_live_config(params: dict):
     """Called by dashboard when operator changes capital limits."""
-    allowed = {"global_limit", "per_stock_limit", "equity_floor"}
+    allowed = {"global_limit", "per_stock_limit", "equity_floor",
+               "max_open_positions", "trailing_profit_pct"}
     cleaned = {k: v for k, v in params.items() if k in allowed}
     if _risk and cleaned:
         _risk.update_live_params(**cleaned)
         _state["live_config"].update(cleaned)
+        # Update config module values at runtime so engine loop picks them up
+        import config as _cfg
+        if "max_open_positions" in cleaned:
+            _cfg.MAX_OPEN_POSITIONS = int(cleaned["max_open_positions"])
+        if "trailing_profit_pct" in cleaned:
+            _cfg.TRAILING_PROFIT_PCT = float(cleaned["trailing_profit_pct"])
+        if "per_stock_limit" in cleaned:
+            _cfg.SLOT_SIZE = float(cleaned["per_stock_limit"])
         log.info("[engine] Live config updated: %s", cleaned)
 
 

@@ -76,6 +76,11 @@ def api_state():
 def api_positions():
     return jsonify(engine.get_state().get("positions", []))
 
+@app.route("/api/pending_exits")
+def api_pending_exits():
+    """Returns positions currently awaiting exit fill confirmation."""
+    return jsonify(engine.get_state().get("pending_exits_detail", []))
+
 @app.route("/api/shadow_leaderboard")
 def api_shadow_leaderboard():
     today = datetime.now().strftime("%Y-%m-%d")
@@ -555,14 +560,21 @@ svg.spark{width:100%;height:38px}
   <div style="background:var(--bg2);border:1px solid var(--border);border-radius:4px;padding:24px;width:340px;font-family:var(--mono)">
     <div style="font-family:var(--head);font-size:11px;letter-spacing:2px;color:var(--cyan);margin-bottom:16px">⚙ LIVE CONFIG — takes effect next cycle</div>
     <div style="display:grid;gap:12px">
-      <label style="font-size:9px;color:var(--text2)">GLOBAL CAPITAL LIMIT (₹)
-        <input id="cfgGlobal" type="number" step="5000" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text1);padding:6px;margin-top:4px;font-family:var(--mono);font-size:11px">
+      <label style="font-size:9px;color:var(--text2)">SLOT SIZE — capital per position (₹)
+        <input id="cfgPerStock" type="number" step="5000" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text1);padding:6px;margin-top:4px;font-family:var(--mono);font-size:11px">
+        <span style="font-size:8px;color:var(--text2);margin-top:2px;display:block">Current: 3 slots × slot size = total deployed max</span>
       </label>
-      <label style="font-size:9px;color:var(--text2)">PER-STOCK LIMIT (₹)
-        <input id="cfgPerStock" type="number" step="1000" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text1);padding:6px;margin-top:4px;font-family:var(--mono);font-size:11px">
+      <label style="font-size:9px;color:var(--text2)">MAX OPEN POSITIONS (slots)
+        <input id="cfgSlots" type="number" step="1" min="1" max="10" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text1);padding:6px;margin-top:4px;font-family:var(--mono);font-size:11px">
+        <span style="font-size:8px;color:var(--text2);margin-top:2px;display:block">Max 1 per sector within these slots</span>
+      </label>
+      <label style="font-size:9px;color:var(--text2)">TARGET+ TRAILING STOP (% of peak profit)
+        <input id="cfgTrailing" type="number" step="1" min="1" max="50" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text1);padding:6px;margin-top:4px;font-family:var(--mono);font-size:11px">
+        <span style="font-size:8px;color:var(--text2);margin-top:2px;display:block">Exit if profit drops this % below peak. 10 = exit at 90% of peak</span>
       </label>
       <label style="font-size:9px;color:var(--text2)">EQUITY FLOOR / KILL SWITCH (₹)
         <input id="cfgFloor" type="number" step="1000" style="width:100%;background:var(--bg3);border:1px solid var(--border);color:var(--text1);padding:6px;margin-top:4px;font-family:var(--mono);font-size:11px">
+        <span style="font-size:8px;color:var(--text2);margin-top:2px;display:block">All positions closed if equity drops below this</span>
       </label>
     </div>
     <div style="display:flex;gap:8px;margin-top:16px">
@@ -746,34 +758,34 @@ function killSwitch(){
 
 // ── LIVE CONFIG ────────────────────────────────────────
 function openConfig(){
-  // Pre-populate with current values from last state
   fetch('/api/config').then(r=>r.json()).then(cfg=>{
-    document.getElementById('cfgGlobal').value   = cfg.global_limit   || 100000;
-    document.getElementById('cfgPerStock').value = cfg.per_stock_limit || 5000;
+    document.getElementById('cfgPerStock').value = cfg.per_stock_limit || 20000;
+    document.getElementById('cfgSlots').value    = cfg.max_open_positions || 5;
+    document.getElementById('cfgTrailing').value = (cfg.trailing_profit_pct || 0.10) * 100;
     document.getElementById('cfgFloor').value    = cfg.equity_floor    || 95000;
     document.getElementById('cfgStatus').textContent = '';
-    const m = document.getElementById('cfgModal');
-    m.style.display='flex';
+    document.getElementById('cfgModal').style.display='flex';
   });
 }
 function closeConfig(){
   document.getElementById('cfgModal').style.display='none';
 }
 function saveConfig(){
-  const gl  = parseFloat(document.getElementById('cfgGlobal').value);
-  const ps  = parseFloat(document.getElementById('cfgPerStock').value);
-  const fl  = parseFloat(document.getElementById('cfgFloor').value);
-  if(isNaN(gl)||isNaN(ps)||isNaN(fl)){
+  const ps   = parseFloat(document.getElementById('cfgPerStock').value);
+  const slots= parseInt(document.getElementById('cfgSlots').value);
+  const tr   = parseFloat(document.getElementById('cfgTrailing').value);
+  const fl   = parseFloat(document.getElementById('cfgFloor').value);
+  if(isNaN(ps)||isNaN(slots)||isNaN(tr)||isNaN(fl)){
     document.getElementById('cfgStatus').textContent='Invalid values';
     document.getElementById('cfgStatus').style.color='var(--red)';
     return;
   }
-  if(fl >= gl){ document.getElementById('cfgStatus').textContent='Floor must be below global limit'; document.getElementById('cfgStatus').style.color='var(--red)'; return; }
-  if(ps > gl){ document.getElementById('cfgStatus').textContent='Per-stock limit must be <= global limit'; document.getElementById('cfgStatus').style.color='var(--red)'; return; }
+  if(slots<1||slots>10){ document.getElementById('cfgStatus').textContent='Slots must be 1-10'; document.getElementById('cfgStatus').style.color='var(--red)'; return; }
+  if(tr<1||tr>50){ document.getElementById('cfgStatus').textContent='Trailing % must be 1-50'; document.getElementById('cfgStatus').style.color='var(--red)'; return; }
   fetch('/api/config',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({global_limit:gl, per_stock_limit:ps, equity_floor:fl})
+    body:JSON.stringify({per_stock_limit:ps, max_open_positions:slots, trailing_profit_pct:tr/100, equity_floor:fl})
   }).then(r=>r.json()).then(d=>{
     if(d.ok){
       document.getElementById('cfgStatus').textContent='✓ Saved — takes effect next cycle';
@@ -917,10 +929,18 @@ function renderPositions(positions){
     const prog=Math.max(0,Math.min(100,(p.current_price-p.entry_price)/(p.target_price-p.entry_price)*100));
     const dirc=p.direction==='LONG'?'dlong':'dshort';
     deployed+=p.entry_price*p.qty;
-    return `<div class="pos-card">
+    const isTrailing=p.trailing_active;
+    const isClosing=p.closing;
+    const statusBadge=isClosing
+      ? '<span style="font-size:8px;font-family:var(--head);font-weight:700;padding:1px 6px;border-radius:2px;background:rgba(255,179,0,.15);color:var(--amber);border:1px solid rgba(255,179,0,.4);" class="blink">CLOSING...</span>'
+      : isTrailing
+      ? '<span style="font-size:8px;font-family:var(--head);font-weight:700;padding:1px 6px;border-radius:2px;background:rgba(0,230,118,.2);color:var(--green);border:1px solid rgba(0,230,118,.5);" class="blink">TARGET+</span>'
+      : '';
+    return `<div class="pos-card" style="${isClosing?'opacity:0.7;':''}${isTrailing?'border-left:2px solid var(--green);':''}">
       <div class="pos-hd">
         <div class="pos-tick ${p.direction==='LONG'?'dir-l':'dir-s'}">${p.ticker}</div>
         <span class="dbadge ${dirc}">${p.direction}</span>
+        ${statusBadge}
         <span style="font-size:9px;color:var(--text2)">${p.strategy_name||'RULE_V1'}</span>
         <div class="ptimer">⏱ ${p.hold_minutes||0}m <span class="blink" style="color:var(--amber)">●</span></div>
       </div>

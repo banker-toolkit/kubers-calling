@@ -153,6 +153,16 @@ MAX_OPEN_POSITIONS   = 5       # total concurrent positions allowed
 SLOT_SIZE            = 20000   # capital per slot (100K / 5)
 MAX_SECTOR_POSITIONS = 1       # max 1 per sector within the 5 slots
 DEFAULT_PER_STOCK_LIMIT = SLOT_SIZE   # backward-compat alias
+
+# ── Trailing profit protection (v9) ─────────────────────────────────
+# Once a position hits its target (TARGET+), instead of closing immediately:
+#   1. Move SL to entry price (breakeven — can't lose now)
+#   2. Track peak profit seen
+#   3. Exit only if profit drops more than TRAILING_PROFIT_PCT below peak
+# Example: target hit at +197, peak reaches +280, exit at +252 (10% below peak)
+# This lets strong institutional moves run while locking in gains.
+TRAILING_PROFIT_PCT    = 0.10   # 10% erosion from peak profit triggers exit
+ENABLE_TRAILING_PROFIT = True   # set False to revert to immediate target exit
 # Minimum notional order value (qty × price). Orders below this are rejected.
 # At ₹15K, round-trip cost ~₹22 = 0.15% — achievable on a 0.3% move.
 # Below ₹15K costs consume too large a fraction of potential profit.

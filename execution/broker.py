@@ -37,6 +37,7 @@ from config import (
     MIN_ORDER_VALUE,
     EXIT_ORDER_TTL_CANDLES, EXIT_MARKET_ESCALATE,
     OUTCOME_HORIZONS,
+    TRAILING_PROFIT_PCT, ENABLE_TRAILING_PROFIT,
 )
 from data.feed import (
     place_order, place_sl_order, cancel_order,
@@ -140,6 +141,8 @@ class LivePosition:
         self.sector        = sector
         self.time_stop_extended = False
         self.entry_narrative    = ""
+        self.trailing_active    = False   # True once target is hit (TARGET+ mode)
+        self.peak_profit        = 0.0     # highest profit seen in TARGET+ mode (₹)
         # v8.1: ATR-based contrarian threshold stored at fill time.
         # = CONTRARIAN_ATR_MULT × atr_15m from signal_log.
         # Used by is_contrarian() instead of flat percentage.
@@ -461,9 +464,28 @@ class Broker:
                 to_close.append((ticker, "TIME_STOP_HARD", None))
                 continue
 
-            # ── 4. Profit target
+            # ── 4. Profit target / TARGET+ trailing mode
             if pos.progress_at(price) >= 1.0:
-                to_close.append((ticker, "TARGET", None))
+                if ENABLE_TRAILING_PROFIT and not pos.trailing_active:
+                    # First time hitting target — enter TARGET+ mode
+                    pos.trailing_active = True
+                    pos.sl_price        = pos.entry_price   # move SL to breakeven
+                    current_profit      = abs(price - pos.entry_price) * pos.qty
+                    pos.peak_profit     = current_profit
+                    log.info("[broker] %s TARGET+ activated — trailing from peak ₹%.0f",
+                             ticker, current_profit)
+                elif pos.trailing_active:
+                    # Already in TARGET+ — update peak and check erosion
+                    current_profit  = abs(price - pos.entry_price) * pos.qty
+                    pos.peak_profit = max(pos.peak_profit, current_profit)
+                    erosion         = (pos.peak_profit - current_profit) / pos.peak_profit if pos.peak_profit > 0 else 0
+                    if erosion >= TRAILING_PROFIT_PCT:
+                        log.info("[broker] %s TARGET+ exit — peak=₹%.0f current=₹%.0f erosion=%.0f%%",
+                                 ticker, pos.peak_profit, current_profit, erosion * 100)
+                        to_close.append((ticker, "TARGET_PLUS", None))
+                else:
+                    # ENABLE_TRAILING_PROFIT is False — close immediately as before
+                    to_close.append((ticker, "TARGET", None))
                 continue
 
             # ── 5. Time stop directional conviction
@@ -516,8 +538,29 @@ class Broker:
             if isinstance(price, dict):
                 price = price.get("price", pos.entry_price)
 
-        # ── SL_HIT: book immediately — no close order needed, position already closed
+        # ── SL_HIT: place market close on IndMoney first, then book.
+        # The engine detects SL breach by price polling — INDstocks equity has no
+        # server-side SL orders. So when Kubers sees an SL breach, the position is
+        # still OPEN on IndMoney. We must send a market close order to actually
+        # square it off, otherwise it becomes a ghost on IndMoney's side.
         if reason == "SL_HIT":
+            exit_side = "SELL" if pos.direction == "LONG" else "BUY"
+            sl_market = FeedOrder(
+                ticker        = ticker,
+                side          = exit_side,
+                qty           = pos.qty,
+                limit_price   = 0,   # market order
+                sl_price      = 0,
+                signal_id     = pos.signal_id,
+                strategy_name = pos.strategy_name,
+            )
+            sl_result = place_order(sl_market)
+            if sl_result.success:
+                log.info("[broker] SL_HIT market close sent: %s %s qty=%d id=%s",
+                         exit_side, ticker, pos.qty, sl_result.order_id)
+            else:
+                log.error("[broker] SL_HIT market close FAILED for %s: %s — "
+                          "close manually on IndMoney", ticker, sl_result.error)
             self._positions.pop(ticker, None)
             self._book_closed_position(pos, price, reason)
             return
@@ -733,16 +776,42 @@ class Broker:
                 q  = current_prices.get(p.ticker, {})
                 cp = float(q.get("price", 0)) if isinstance(q, dict) else float(q or 0)
             result.append({
-                "ticker":        p.ticker,
-                "direction":     p.direction,
-                "entry_price":   p.entry_price,
-                "qty":           p.qty,
-                "hold_minutes":  round(p.hold_minutes(), 1),
-                "sl_price":      p.sl_price,
-                "target_price":  p.target_price,
-                "current_price": cp if cp > 0 else p.entry_price,
-                "sector":        p.sector,
-                "strategy_name": p.strategy_name,
+                "ticker":          p.ticker,
+                "direction":       p.direction,
+                "entry_price":     p.entry_price,
+                "qty":             p.qty,
+                "hold_minutes":    round(p.hold_minutes(), 1),
+                "sl_price":        p.sl_price,
+                "target_price":    p.target_price,
+                "current_price":   cp if cp > 0 else p.entry_price,
+                "sector":          p.sector,
+                "strategy_name":   p.strategy_name,
+                "trailing_active": p.trailing_active,
+                "peak_profit":     p.peak_profit,
+                "closing":         False,
+            })
+        return result
+
+    def get_pending_exits_detail(self) -> list:
+        """Returns positions in _pending_exits for dashboard CLOSING... display."""
+        result = []
+        for ticker, pex in self._pending_exits.items():
+            pos = pex["pos"]
+            result.append({
+                "ticker":          ticker,
+                "direction":       pos.direction,
+                "entry_price":     pos.entry_price,
+                "qty":             pos.qty,
+                "hold_minutes":    round(pos.hold_minutes(), 1),
+                "sl_price":        pos.sl_price,
+                "target_price":    pos.target_price,
+                "current_price":   pex["exit_price"],
+                "sector":          pos.sector,
+                "strategy_name":   pos.strategy_name,
+                "trailing_active": False,
+                "peak_profit":     0.0,
+                "closing":         True,   # ← dashboard shows CLOSING...
+                "exit_reason":     pex["reason"],
             })
         return result
 
@@ -833,7 +902,10 @@ def _build_exit_narrative(pos, exit_price: float, reason: str, net_pnl: float) -
     pnl_sign = "+" if net_pnl >= 0 else ""
     hold     = round(pos.hold_minutes(), 1)
 
-    if reason == "TIME_STOP_CHECK":
+    if reason == "TARGET_PLUS":
+        detail = (f"TARGET+ trailing exit — peak profit ₹{pos.peak_profit:.0f}, "
+                  f"exited at ₹{net_pnl:.0f} net after 10% erosion trigger")
+    elif reason == "TIME_STOP_CHECK":
         if pos.entry_price > 0:
             adverse_pct = abs(exit_price - pos.entry_price) / pos.entry_price * 100
             detail = (f"Contrarian move detected at {hold}m — price moved "
