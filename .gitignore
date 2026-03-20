@@ -9,3 +9,10 @@ deploy/
 *.pyc
 trade_log_*.csv
 signal_log_*.csv
+_backup*/ 
+*.bak_* 
+apply_all_fixes.py 
+apply_fixes*.py 
+fix_*.py 
+diag.py 
+fixes.py 
