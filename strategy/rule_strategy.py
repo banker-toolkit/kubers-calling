@@ -75,11 +75,12 @@ class RuleStrategy(Strategy):
 
         # ── Compute volume velocity ONCE here so we can log it cleanly ──
         # vol_vel_ratio: how much bigger is the current candle's volume
-        # vs the previous completed candle. Used for display and logging.
-        # The guard itself stays binary per operator decision — any
-        # positive growth fires. The ratio is logged for future calibration.
-        current_vol  = snapshot.candles_3m[-1].get("volume", 0) if n3m >= 2 else 0
-        prev_vol     = snapshot.candles_3m[-2].get("volume", 0) if n3m >= 2 else 0
+        # ── Compute volume velocity using 15m candles (not 3m).
+        # Velocity confirms the lion has been active for TWO consecutive 15m
+        # windows — not just one spike. Comparing 3m[-1] vs 3m[-2] could fire
+        # on a single large order; 15m[-1] vs 15m[-2] requires sustained flow.
+        current_vol  = snapshot.candles_15m[-1].get("volume", 0) if n15m >= 2 else 0
+        prev_vol     = snapshot.candles_15m[-2].get("volume", 0) if n15m >= 2 else 0
         vol_growing  = (current_vol > prev_vol)
         # When prev_vol=0 and current_vol>0: genuine new volume appearing — guard passes.
         # Use 9.999 sentinel so display and gate trace both show a high ratio (✓)
@@ -176,14 +177,14 @@ class RuleStrategy(Strategy):
             )
             return SignalResult("PASS", metadata=meta)
 
-        # ── Spy: Candle structure ──────────────────────────────────────
-        latest_3m    = snapshot.candles_3m[-1]
-        candle_range = latest_3m["high"] - latest_3m["low"]
+        # ── Spy: Candle structure (15m candle — matches signal cadence) ──
+        latest_15m   = snapshot.candles_15m[-1]
+        candle_range = latest_15m["high"] - latest_15m["low"]
         if candle_range <= 0:
             meta["reject_reason"] = "Zero candle range"
             return SignalResult("PASS", metadata=meta)
 
-        close_position = (latest_3m["close"] - latest_3m["low"]) / candle_range
+        close_position = (latest_15m["close"] - latest_15m["low"]) / candle_range
         meta["close_position"] = round(close_position, 3)
         meta["sector_lag"]     = round(snapshot.sector_lag, 4)
         meta["sector_slope"]   = round(snapshot.sector_slope, 6)

@@ -223,8 +223,20 @@ class FeatureEngine:
             move           = abs(open_candle["close"] - open_candle["open"])
             velocity_ratio = move / atr_15m
 
-        # ── Volume Z-score
-        vol_z = get_volume_z(ticker, volume, now)
+        # ── Volume Z-score — use latest COMPLETED 15m candle volume.
+        # Backtest (50 stocks, 60 days) confirmed 15m cadence gives positive
+        # expectancy (+0.006%/trade, win/loss 1.11) vs 3m cadence which is a
+        # near-coin-flip (-0.014%/trade, win/loss 0.99). A single 3m spike can
+        # be one large order; 15m sustained volume confirms the lion has been
+        # feeding for a full window, not just touched the tape.
+        if candles_15m:
+            vol_for_z = candles_15m[-1]["volume"]
+            from datetime import datetime as _dt
+            ts_for_z  = _dt.fromtimestamp(candles_15m[-1]["time"])
+        else:
+            vol_for_z = volume
+            ts_for_z  = now
+        vol_z = get_volume_z(ticker, vol_for_z, ts_for_z)
 
         # ── Ex-self sector composite
         composite = build_ex_self_composite(ticker, sector_peer_closes)

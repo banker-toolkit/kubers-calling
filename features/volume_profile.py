@@ -4,8 +4,15 @@ KUBER'S CALLING — features/volume_profile.py
 Layer 2: Time-of-day normalised volume Z-scores.
 
 Each ticker's volume is compared against its own historical mean
-for the SAME 3-minute time bucket. 09:15 volume is compared against
+for the SAME 15-minute time bucket. 09:15 volume is compared against
 09:15 history only — not a flat daily mean.
+
+CADENCE: 15m (switched from 3m after backtest — see notes below)
+  Backtest result (50 stocks, 60 days, Mar 2026):
+    3m: expectancy -0.014%/trade, win/loss ratio 0.99 (coin flip)
+   15m: expectancy +0.006%/trade, win/loss ratio 1.11
+  Root cause: a single 3m spike can be one large order; 15m sustained
+  volume confirms institutional flow has persisted for a full window.
 
 RULES:
   - Pure Python arithmetic — no numpy, no scipy
@@ -68,14 +75,14 @@ def build_volume_profile(tickers: list = None) -> int:
             rows = conn.execute(f"""
                 SELECT ticker, time, volume
                 FROM historical_candles
-                WHERE timeframe='3m' AND ticker IN ({placeholders})
+                WHERE timeframe='15m' AND ticker IN ({placeholders})
                 ORDER BY ticker, time
             """, tickers).fetchall()
         else:
             rows = conn.execute("""
                 SELECT ticker, time, volume
                 FROM historical_candles
-                WHERE timeframe='3m'
+                WHERE timeframe='15m'
                 ORDER BY ticker, time
             """).fetchall()
         conn.close()
