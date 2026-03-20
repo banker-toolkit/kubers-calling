@@ -117,9 +117,6 @@ def run_static():
         # Skip ml_workbench — separate application
         if "ml_workbench" in str(f):
             continue
-        if f.name in ("check.py", "fix.py", "fix2.py", "fix_db.py",
-                       "ca2.py", "candle_analysis.py", "candle_check.py"):
-            continue  # diagnostic scripts — not part of engine
         tree, _ = parse(str(f))
         record("STATIC", "SYN-001",
                f"{f.name}: valid Python syntax",
@@ -303,9 +300,7 @@ def run_static():
                           and 'print' not in line
                           and 'f"' not in line
                           and "f'" not in line]
-            # Skip lines that are docstring prose (no assignment or call syntax)
-            is_prose = (not re.search(r'[=()]', code_part))
-            if real_magic and not is_prose:
+            if real_magic:
                 magic.append(f"L{i}: {line.strip()[:60]}")
         record("STATIC", "ARCH-001",
                f"{fname}: no obvious magic numbers (thresholds from config)",
@@ -503,18 +498,8 @@ def run_unit_tests():
             from risk.risk_gate import RiskManager
         except ImportError:
             from bouncer import RiskManager
-        b = object.__new__(RiskManager)
-        b.kill_switch_fired    = True
-        b.live_positions       = {}
-        b.current_equity       = 100000.0
-        b.equity_floor         = 95000.0
-        b.global_limit         = 100000.0
-        b.per_stock_limit      = 25000.0
-        b.max_order_value      = 45000.0
-        b.session_pnl          = 0.0
-        b._sl_cooldown         = {}
-        import collections as _col
-        b._entry_timestamps    = _col.deque()
+        b = RiskManager()
+        b.kill_switch_fired = True
         qty, msg = b.validate_order(
             "TCS", "BUY", 3500.0, 2, "IT", 2.5, 0.0
         )
@@ -848,10 +833,10 @@ def run_unit_tests():
     # Root cause: No UI for changing limits → operator cannot adjust them at runtime
     try:
         kc_src = open("kubers_calling.py", encoding="utf-8").read()
-        has_global    = "cfgGlobal"    in kc_src or "global_limit"  in kc_src
-        has_per_stock = "cfgPerStock"  in kc_src or "per_stock"     in kc_src
-        has_floor     = "cfgFloor"     in kc_src or "equity_floor"  in kc_src
-        has_save      = "saveConfig"   in kc_src or "save_config"   in kc_src
+        has_global    = "cfgGlobal"    in kc_src
+        has_per_stock = "cfgPerStock"  in kc_src
+        has_floor     = "cfgFloor"     in kc_src
+        has_save      = "saveConfig"   in kc_src
         passed = has_global and has_per_stock and has_floor and has_save
         missing = [n for n, v in [("cfgGlobal", has_global),("cfgPerStock", has_per_stock),
                                    ("cfgFloor", has_floor),("saveConfig", has_save)] if not v]

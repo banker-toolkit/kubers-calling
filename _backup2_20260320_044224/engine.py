@@ -113,8 +113,6 @@ def startup() -> bool:
     # DB init
     init_live_db()
     init_decisions_db()
-    from database.vault import migrate_live_db
-    migrate_live_db()   # safe: adds new columns, never drops data
     log.info("[startup] Databases initialised")
 
     # API auth
@@ -203,13 +201,6 @@ def startup() -> bool:
 
     # Startup reconciliation — compare broker vs DB
     _reconcile_positions()
-
-    # Wire Gmail alerts (non-fatal if notify creds not configured)
-    try:
-        from notifier import wire_alerts
-        wire_alerts()
-    except Exception as e:
-        log.debug("[startup] Gmail alerts not wired: %s", e)
 
     log.info("[startup] Startup complete — engine ready")
     return True
@@ -355,7 +346,7 @@ def run_cycle():
     live_strategy = registry.get_live_strategy()
     decision_log  = []
     now_str = datetime.now().strftime("%H:%M")
-    no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF) or _state.get("operator_stop_new", False)
+    no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF)
     if no_new_entries:
         log.info("[engine] %s reached — no new entries. Exits and fills still active.", NO_NEW_ENTRIES_CUTOFF)
 

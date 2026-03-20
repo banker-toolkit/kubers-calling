@@ -240,68 +240,66 @@ def _connect(path):
     return conn
 
 
+def migrate_live_db():
+    """
+    Add new columns to existing tables without dropping data.
+    Safe to run on every startup — ALTER TABLE fails silently if column exists.
+    Called by init_live_db() automatically.
+    """
+    conn = _connect(DB_LIVE_PATH)
+    migrations = [
+        # positions — three-ID lineage
+        "ALTER TABLE positions ADD COLUMN exit_order_id TEXT",
+        "ALTER TABLE positions ADD COLUMN residual_id TEXT",
+        "ALTER TABLE positions ADD COLUMN position_type TEXT DEFAULT 'NORMAL'",
+        # trade_log — three-ID lineage
+        "ALTER TABLE trade_log ADD COLUMN order_id TEXT",
+        "ALTER TABLE trade_log ADD COLUMN exit_order_id TEXT",
+        "ALTER TABLE trade_log ADD COLUMN residual_id TEXT",
+        "ALTER TABLE trade_log ADD COLUMN position_type TEXT DEFAULT 'NORMAL'",
+        # signal_log — order_id for cross-referencing
+        "ALTER TABLE signal_log ADD COLUMN order_id TEXT",
+    ]
+    for sql in migrations:
+        try:
+            conn.execute(sql)
+        except Exception:
+            pass  # column already exists — silently continue
+    conn.commit()
+    conn.close()
+
 
 def init_live_db():
     conn = _connect(DB_LIVE_PATH)
-    try:
-        conn.executescript(_LIVE_SCHEMA)
-    except Exception:
-        pass   # existing DB has old schema — migrate_live_db() adds missing columns
+    conn.executescript(_LIVE_SCHEMA)
     conn.commit()
     conn.close()
-    migrate_live_db()  # always run — adds any columns missing from old schemas
     migrate_live_db()   # v8: apply column migrations on every startup
-
 
 
 
 def migrate_live_db():
     """
-    Safe schema migration — adds ANY missing columns to existing tables.
-    Uses ALTER TABLE ADD COLUMN which is non-destructive (never drops data).
-    Called from init_live_db() so it runs on EVERY import of vault,
-    including during validate.py test runs — not just engine startup.
-    Idempotent: safe to call multiple times.
+    Safe schema migration — adds new columns to existing DB without destroying data.
+    Called at startup after init_live_db(). Idempotent — safe to call every run.
+    SQLite does not support DROP COLUMN so old columns are always preserved.
     """
-    migrations = [
-        # positions table — columns added over v4-v8 lifecycle
-        ("positions", "order_id",        "TEXT"),
-        ("positions", "signal_id",       "TEXT"),
-        ("positions", "strategy_name",   "TEXT"),
-        ("positions", "sector",          "TEXT"),
-        ("positions", "target_price",    "REAL"),
-        ("positions", "sl_price",        "REAL"),
-        ("positions", "exit_order_id",   "TEXT"),
-        ("positions", "residual_id",     "TEXT"),
-        ("positions", "position_type",   "TEXT DEFAULT 'LIVE'"),
-        # trade_log — v8 MFE/MAE columns
-        ("trade_log", "mfe_5m",  "REAL"),
-        ("trade_log", "mfe_10m", "REAL"),
-        ("trade_log", "mfe_20m", "REAL"),
-        ("trade_log", "mae_5m",  "REAL"),
-        ("trade_log", "mae_10m", "REAL"),
-        # signal_log — v7/v8 additions
-        ("signal_log", "atr_15m",    "REAL"),
-        ("signal_log", "risk_reason","TEXT"),
-        ("signal_log", "gate_trace", "TEXT"),
-    ]
+    conn = _connect(DB_LIVE_PATH)
     try:
-        conn = _connect(DB_LIVE_PATH)
-        for table, col, col_type in migrations:
-            try:
-                existing = {r[1] for r in
-                            conn.execute(f"PRAGMA table_info({table})").fetchall()}
-                if col not in existing:
-                    conn.execute(
-                        f"ALTER TABLE {table} ADD COLUMN {col} {col_type}"
-                    )
-                    conn.commit()
-            except Exception:
-                pass   # Table may not exist yet — init_live_db will create it
-        conn.close()
+        existing = {row[1] for row in conn.execute("PRAGMA table_info(positions)").fetchall()}
+        migrations = [
+            ("exit_order_id", "TEXT"),
+            ("residual_id",   "TEXT"),
+            ("position_type", "TEXT DEFAULT 'LIVE'"),
+        ]
+        for col, col_type in migrations:
+            if col not in existing:
+                conn.execute(f"ALTER TABLE positions ADD COLUMN {col} {col_type}")
+                conn.commit()
     except Exception as e:
-        import logging
-        logging.getLogger("vault").debug("migrate_live_db: %s", e)
+        import logging; logging.getLogger("vault").warning("migrate_live_db: %s", e)
+    finally:
+        conn.close()
 
 
 def init_decisions_db():

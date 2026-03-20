@@ -46,7 +46,7 @@ from config import (
 )
 
 from database.vault       import init_live_db, init_decisions_db
-from data.feed            import load_token, verify_connection, forge_token_map, fetch_nifty_data, fetch_vix, fetch_quotes, fetch_broker_positions, place_market_order, start_order_ws, start_order_ws
+from data.feed            import load_token, verify_connection, forge_token_map, fetch_nifty_data, fetch_vix, fetch_quotes, fetch_broker_positions, place_market_order, start_order_ws
 from data.candle_factory  import candle_store
 from data.history_store   import load_into_factory
 from features.feature_engine import FeatureEngine, RegimeState, feature_engine, _compute_atr
@@ -113,8 +113,6 @@ def startup() -> bool:
     # DB init
     init_live_db()
     init_decisions_db()
-    from database.vault import migrate_live_db
-    migrate_live_db()   # safe: adds new columns, never drops data
     log.info("[startup] Databases initialised")
 
     # API auth
@@ -194,22 +192,8 @@ def startup() -> bool:
 
     _state["running"] = True
 
-    # Start WebSocket for real-time order fill updates (v8)
-    try:
-        start_order_ws()
-        log.info("[startup] Order WebSocket connected")
-    except Exception as e:
-        log.warning("[startup] WebSocket failed (REST polling fallback active): %s", e)
-
     # Startup reconciliation — compare broker vs DB
     _reconcile_positions()
-
-    # Wire Gmail alerts (non-fatal if notify creds not configured)
-    try:
-        from notifier import wire_alerts
-        wire_alerts()
-    except Exception as e:
-        log.debug("[startup] Gmail alerts not wired: %s", e)
 
     log.info("[startup] Startup complete — engine ready")
     return True
@@ -355,16 +339,9 @@ def run_cycle():
     live_strategy = registry.get_live_strategy()
     decision_log  = []
     now_str = datetime.now().strftime("%H:%M")
-    no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF) or _state.get("operator_stop_new", False)
+    no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF)
     if no_new_entries:
         log.info("[engine] %s reached — no new entries. Exits and fills still active.", NO_NEW_ENTRIES_CUTOFF)
-
-    # ── FORCE CLOSE at 15:10 — Kubers proactive squareoff before IndMoney 15:20
-    if now_str >= FORCE_CLOSE_TIME and _broker:
-        open_pos = len(_broker._positions)
-        if open_pos > 0:
-            log.warning("[engine] FORCE_CLOSE_TIME %s reached — closing %d positions", FORCE_CLOSE_TIME, open_pos)
-            _broker.force_close_all(reason="FORCE_CLOSE")
 
     # ── 15:10 force close — Kubers proactive squareoff (before IndMoney 15:20)
     # Applies to ALL positions including residuals.

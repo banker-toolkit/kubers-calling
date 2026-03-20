@@ -46,7 +46,6 @@ from config import (
     MAX_ORDER_VALUE,
     MAX_ENTRY_PRICE,
     MAX_OPEN_POSITIONS,
-    SLOT_SIZE,
 )
 
 from database.vault import (
@@ -230,16 +229,10 @@ class RiskManager:
         if order_value > per_limit:
             qty = math.ceil(per_limit / price)
 
-        # Cap at MAX_ORDER_VALUE per order. MIN_ORDER_VALUE is a
-        # rejection threshold handled in broker.submit() — not a
-        # floor here (would override open-protection halving).
-        qty = min(qty, int(self.max_order_value / price))
+        # Clamp between MIN_ORDER_VALUE and MAX_ORDER_VALUE
+        qty = max(math.ceil(MIN_ORDER_VALUE / price), min(qty, int(self.max_order_value / price)))
         qty = max(1, qty)
         order_value = price * qty
-
-        # Reject if order too small to be cost-effective
-        if order_value < MIN_ORDER_VALUE:
-            return 0, f"MIN_VALUE:₹{order_value:.0f} < ₹{MIN_ORDER_VALUE:.0f}"
 
         # Global limit check
         if deployed + order_value > self.global_limit:

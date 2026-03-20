@@ -206,16 +206,6 @@ def api_token():
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 500
 
-
-@app.route("/api/stop_orders", methods=["POST"])
-def api_stop_orders():
-    """Toggle operator pause — blocks new entries without stopping exits."""
-    data = request.get_json(silent=True) or {}
-    stop = bool(data.get("stop", True))
-    engine._state["operator_stop_new"] = stop
-    log.info("[dashboard] operator_stop_new=%s", stop)
-    return jsonify({"ok": True, "stop_new": stop})
-
 @app.route("/api/scanner")
 def api_scanner():
     """Return last scanner decision_log for all tickers."""
@@ -563,7 +553,6 @@ svg.spark{width:100%;height:38px}
   </div>
   <button class="kill-btn" onclick="killSwitch()">🔴 KILL</button>
   <button class="kill-btn" style="background:rgba(0,176,80,.08);border-color:var(--green2);color:var(--green)" onclick="openConfig()">⚙ CONFIG</button>
-  <button class="kill-btn" id="stopNewBtn" style="background:rgba(255,179,0,.08);border-color:var(--amber2);color:var(--amber)" onclick="toggleStopNew()">⏸ STOP NEW</button>
 </div>
 
 <!-- CONFIG MODAL -->
