@@ -92,6 +92,9 @@ _broker    = None
 # Addresses COFORGE-style 5× qty bug observed on 2026-03-17.
 # {ticker: epoch_timestamp_of_last_submit}
 _last_submit_time: dict = {}
+# Volume delta tracking — INDstocks returns CUMULATIVE daily volume.
+# We store the last seen value and pass only the delta to candle_store.
+_prev_volume: dict = {}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -305,7 +308,10 @@ def run_cycle():
 
     # ── Tick NIFTY candles
     if nifty_price > 0:
-        candle_store.tick("NIFTY 50", nifty_price, nifty_volume)
+        _nifty_prev = _prev_volume.get("NIFTY 50", 0)
+        _nifty_delta = nifty_volume - _nifty_prev if nifty_volume >= _nifty_prev else nifty_volume
+        _prev_volume["NIFTY 50"] = nifty_volume
+        candle_store.tick("NIFTY 50", nifty_price, _nifty_delta)
         # Set today's open once — first cycle where NIFTY is non-zero
         if feature_engine._nifty_open == 0.0 and nifty_open > 0:
             feature_engine.set_nifty_open(nifty_open)
@@ -340,8 +346,18 @@ def run_cycle():
     prices     = fetch_quotes(tickers)   # {ticker: {price, open, volume...}}
 
     # ── Tick candles for all tickers
+    # Store deltas in _tick_deltas so feature_engine.build() gets the same
+    # correct per-interval volume (not raw cumulative from the API).
+    _tick_deltas: dict = {}
     for ticker, q in prices.items():
-        candle_store.tick(ticker, q["price"], q.get("volume", 0))
+        _cum_vol = q.get("volume", 0)
+        _prev_cum = _prev_volume.get(ticker, 0)
+        # Delta volume: shares traded in this 2.5s interval
+        # If cumulative dropped (reset or data gap), use full value
+        _delta_vol = _cum_vol - _prev_cum if _cum_vol >= _prev_cum else _cum_vol
+        _prev_volume[ticker] = _cum_vol
+        _tick_deltas[ticker] = _delta_vol
+        candle_store.tick(ticker, q["price"], _delta_vol)
 
     # Build sector peer close series
     sector_closes = _build_sector_closes(tickers, prices)
@@ -410,7 +426,7 @@ def run_cycle():
             snap = feature_engine.build(
                 ticker            = ticker,
                 price             = q["price"],
-                volume            = q.get("volume", 0),
+                volume            = (candle_store.get_candles(ticker, "3m") or [{}])[-1].get("volume", 0),  # last completed 3m candle volume — directly comparable to historical mu/sigma
                 sector            = sector,
                 adv_tier          = adv_tier,
                 sector_peer_closes= sector_closes.get(sector, {}),
