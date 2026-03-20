@@ -31,7 +31,6 @@ from config import (
     TOKEN_MAP_MIN_EXPECTED,
     SCAN_INTERVAL_SEC,
     EOD_SQUAREOFF_TIME,
-    FORCE_CLOSE_TIME,
     NO_NEW_ENTRIES_CUTOFF,
     DOSSIER_TIME,
     ENABLE_ML_STRATEGY,
@@ -46,7 +45,7 @@ from config import (
 )
 
 from database.vault       import init_live_db, init_decisions_db
-from data.feed            import load_token, verify_connection, forge_token_map, fetch_nifty_data, fetch_vix, fetch_quotes, fetch_broker_positions, place_market_order, start_order_ws, start_order_ws
+from data.feed            import load_token, verify_connection, forge_token_map, fetch_nifty_data, fetch_vix, fetch_quotes, fetch_broker_positions, place_market_order
 from data.candle_factory  import candle_store
 from data.history_store   import load_into_factory
 from features.feature_engine import FeatureEngine, RegimeState, feature_engine, _compute_atr
@@ -92,9 +91,6 @@ _broker    = None
 # Addresses COFORGE-style 5× qty bug observed on 2026-03-17.
 # {ticker: epoch_timestamp_of_last_submit}
 _last_submit_time: dict = {}
-# Volume delta tracking — INDstocks returns CUMULATIVE daily volume.
-# We store the last seen value and pass only the delta to candle_store.
-_prev_volume: dict = {}
 
 
 # ═══════════════════════════════════════════════════════════════════
@@ -116,8 +112,6 @@ def startup() -> bool:
     # DB init
     init_live_db()
     init_decisions_db()
-    from database.vault import migrate_live_db
-    migrate_live_db()   # safe: adds new columns, never drops data
     log.info("[startup] Databases initialised")
 
     # API auth
@@ -186,33 +180,10 @@ def startup() -> bool:
     else:
         log.info("[startup] NIFTY/VIX not yet available (pre-market) — "
                  "engine will enter STANDBY until market opens")
-    # Start WebSocket order updates listener (primary fill confirmation channel)
-    # Token is valid all day — connection opened once, stays open.
-    # Falls back to REST polling transparently if WS unavailable.
-    try:
-        start_order_ws()
-        log.info("[startup] Order WebSocket started")
-    except Exception as e:
-        log.warning("[startup] Order WebSocket failed to start (REST fallback active): %s", e)
-
     _state["running"] = True
-
-    # Start WebSocket for real-time order fill updates (v8)
-    try:
-        start_order_ws()
-        log.info("[startup] Order WebSocket connected")
-    except Exception as e:
-        log.warning("[startup] WebSocket failed (REST polling fallback active): %s", e)
 
     # Startup reconciliation — compare broker vs DB
     _reconcile_positions()
-
-    # Wire Gmail alerts (non-fatal if notify creds not configured)
-    try:
-        from notifier import wire_alerts
-        wire_alerts()
-    except Exception as e:
-        log.debug("[startup] Gmail alerts not wired: %s", e)
 
     log.info("[startup] Startup complete — engine ready")
     return True
@@ -308,10 +279,7 @@ def run_cycle():
 
     # ── Tick NIFTY candles
     if nifty_price > 0:
-        _nifty_prev = _prev_volume.get("NIFTY 50", 0)
-        _nifty_delta = nifty_volume - _nifty_prev if nifty_volume >= _nifty_prev else nifty_volume
-        _prev_volume["NIFTY 50"] = nifty_volume
-        candle_store.tick("NIFTY 50", nifty_price, _nifty_delta)
+        candle_store.tick("NIFTY 50", nifty_price, nifty_volume)
         # Set today's open once — first cycle where NIFTY is non-zero
         if feature_engine._nifty_open == 0.0 and nifty_open > 0:
             feature_engine.set_nifty_open(nifty_open)
@@ -346,18 +314,8 @@ def run_cycle():
     prices     = fetch_quotes(tickers)   # {ticker: {price, open, volume...}}
 
     # ── Tick candles for all tickers
-    # Store deltas in _tick_deltas so feature_engine.build() gets the same
-    # correct per-interval volume (not raw cumulative from the API).
-    _tick_deltas: dict = {}
     for ticker, q in prices.items():
-        _cum_vol = q.get("volume", 0)
-        _prev_cum = _prev_volume.get(ticker, 0)
-        # Delta volume: shares traded in this 2.5s interval
-        # If cumulative dropped (reset or data gap), use full value
-        _delta_vol = _cum_vol - _prev_cum if _cum_vol >= _prev_cum else _cum_vol
-        _prev_volume[ticker] = _cum_vol
-        _tick_deltas[ticker] = _delta_vol
-        candle_store.tick(ticker, q["price"], _delta_vol)
+        candle_store.tick(ticker, q["price"], q.get("volume", 0))
 
     # Build sector peer close series
     sector_closes = _build_sector_closes(tickers, prices)
@@ -371,24 +329,9 @@ def run_cycle():
     live_strategy = registry.get_live_strategy()
     decision_log  = []
     now_str = datetime.now().strftime("%H:%M")
-    no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF) or _state.get("operator_stop_new", False)
+    no_new_entries = (now_str >= NO_NEW_ENTRIES_CUTOFF)
     if no_new_entries:
         log.info("[engine] %s reached — no new entries. Exits and fills still active.", NO_NEW_ENTRIES_CUTOFF)
-
-    # ── FORCE CLOSE at 15:10 — Kubers proactive squareoff before IndMoney 15:20
-    if now_str >= FORCE_CLOSE_TIME and _broker:
-        open_pos = len(_broker._positions)
-        if open_pos > 0:
-            log.warning("[engine] FORCE_CLOSE_TIME %s reached — closing %d positions", FORCE_CLOSE_TIME, open_pos)
-            _broker.force_close_all(reason="FORCE_CLOSE")
-
-    # ── 15:10 force close — Kubers proactive squareoff (before IndMoney 15:20)
-    # Applies to ALL positions including residuals.
-    if now_str >= FORCE_CLOSE_TIME and not getattr(_broker, '_force_close_fired', False):
-        log.warning("[engine] FORCE_CLOSE_TIME %s reached — closing all positions", FORCE_CLOSE_TIME)
-        _broker._force_close_fired = True
-        _broker.force_close_all(reason="FORCE_CLOSE")
-        _state["positions"] = []
 
     if regime != RegimeState.STANDBY and not _risk.kill_switch_fired and not no_new_entries:
 
@@ -426,7 +369,7 @@ def run_cycle():
             snap = feature_engine.build(
                 ticker            = ticker,
                 price             = q["price"],
-                volume            = (candle_store.get_candles(ticker, "3m") or [{}])[-1].get("volume", 0),  # last completed 3m candle volume — directly comparable to historical mu/sigma
+                volume            = q.get("volume", 0),
                 sector            = sector,
                 adv_tier          = adv_tier,
                 sector_peer_closes= sector_closes.get(sector, {}),
